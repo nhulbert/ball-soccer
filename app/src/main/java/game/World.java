@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 
+// The Bullet physics world class, also used for storing the static physics objects comprising the 'world'
+
 public class World{
 	PhysicsWorld physicsWorld;
     Bullet bullet;
@@ -35,20 +37,19 @@ public class World{
     float[] groundPoints;
     int[] groundInds;
 
+	final static int XSIZE = 81; // number of mesh points along the x axis
+	final static int YSIZE = 81; // and the y axis
 
+	final static int EDGE_WIDTH = 4; // width of the sloped edges of the field
 
-	final static int XSIZE = 81;
-	final static int YSIZE = 81;
+	final static int XNUM = XSIZE-2*EDGE_WIDTH; // number of mesh points along the x axis excluding the edges
+	final static int YNUM = YSIZE-2*EDGE_WIDTH; // and along the y axis
 
-	final static int EDGE_WIDTH = 4;
+	final static float scale = 2f; // the distance between adjacent mesh points
 
-	final static int XNUM = XSIZE-2*EDGE_WIDTH;
-	final static int YNUM = YSIZE-2*EDGE_WIDTH;
+    Map<Integer,RigidBody> rigidbodies; // Bullet rigidbody collection
 
-	final static float scale = 2f;
-
-    Map<Integer,RigidBody> rigidbodies;
-    
+	// holds the OpenGL buffer indices
     int vertBufInd=-1;
     int faceBufInd=-1;
     
@@ -70,6 +71,7 @@ public class World{
 
 		//Random r1 = new Random(System.currentTimeMillis());
 
+		// Creates ground without edges
 		if (level == null) {
 			for (int i = 0; i < YNUM; i++) {
 				for (int h = 0; h < XNUM; h++) {
@@ -142,6 +144,7 @@ public class World{
 			}
 		}*/
 
+		// Creates the sloped edges of the ground, with t being the parameter for the iteration
 		int numSquares = (XNUM-1)*(YNUM-1);
 
 		groundInds = new int[6*(numSquares+2*EDGE_WIDTH*(XNUM+YSIZE))-3*(EDGE_WIDTH*4)];
@@ -386,6 +389,7 @@ public class World{
         createSkybox();
     }
 
+	// Creates the skybox
 	private void createSkybox() {
     	ArrayList<Float> verts = new ArrayList<>(Arrays.asList(
     			-1f,-1f,-1f,
@@ -431,6 +435,7 @@ public class World{
         time = curtime;
     }
 
+	// The collision checking methods
     public boolean isGroundColliding(Entity a){
     	return PhysObject.bullet.isColliding(a.getPhysObj().rigidBody, ground.rigidBody);
     }
@@ -455,7 +460,8 @@ public class World{
 		//Draw.draw(hole2.vertBufInd, hole2.faceBufInd, hole2.faces.size()*3, mViewMatrix, mProjectionMatrix, m ,0);
     	Draw.drawSkybox(vertBufIndSkybox, faceBufIndSkybox, indexCountSkybox, mViewMatrix, mProjectionMatrix, 2);
     }
-    
+
+	// Adds an object to the physics world by calculating the object's convex hull and using it to approximate the object's shape
     public PhysObject addConvexHullObj(ArrayList<Vector3> points, float[] trans, float mass){
         float[] verts = new float[3*points.size()];
         
@@ -471,6 +477,7 @@ public class World{
         return new PhysObject(physicsWorld, shape, motionState, mass, trans);
     }
 
+	// Adds an object to the physics world by using precisely the same geometric mesh used for rendering
 	public PhysObject addTriangleMeshObj(ArrayList<Vector3> points, ArrayList<ArrayList<Integer>> inds, float[] trans, float mass){
 		float[] verts = new float[3*points.size()];
 		int[] indices = new int[3*inds.size()];
@@ -492,7 +499,8 @@ public class World{
 
 		return new PhysObject(physicsWorld, shape, motionState, mass, trans);
 	}
-    
+
+	// Creates the OpenGL buffers for the world's static objects
     private void createBuffers(){
 		final int vertBuf[] = new int[1];
     	final int faceBuf[] = new int[1];
@@ -657,7 +665,8 @@ public class World{
 		
 		GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
     }
-    
+
+	// Generates the OpenGL buffers given an object's OpenGL relevant info
     private ArrayList<Integer> generateBuffers(ArrayList<Float> verts, ArrayList<Float> norms, ArrayList<Integer> inds, ArrayList<Float> uv){
     	final int vertBuf[] = new int[1];
     	final int faceBuf[] = new int[1];

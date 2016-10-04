@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.TimerTask;
 
+// Task that attempts to connect to a specified Server socket
+
 public class ConnectAttempt extends TimerTask{
 	Client client;
 	

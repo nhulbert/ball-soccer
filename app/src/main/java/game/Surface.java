@@ -8,6 +8,8 @@ import android.opengl.GLSurfaceView;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
+// The surfaceview class, only used to handle raw input
+
 public class Surface extends GLSurfaceView {	
 	public ArrayList<Boolean> processDown = new ArrayList<>(Arrays.asList(false, false));
 	public ArrayList<Boolean> processUp = new ArrayList<>(Arrays.asList(false, false));

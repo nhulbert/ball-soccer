@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.TimerTask;
 
+// A task that sends (possibly multi-packet) messages guaranteed to be successfully received, barring the timeout period lapsing on any individual packet
+
 public class AssuredMessage extends TimerTask{
     private Client client=null;
     private Server server=null;
@@ -20,27 +22,27 @@ public class AssuredMessage extends TimerTask{
 
     private int localPort;
 
-    private static int code=0;
+    private static int code=0; // Unique code to assign to individual instances
 
-    private Integer localCode;
+    private Integer localCode; // Unique task code
 
-    private byte type;
+    private byte type; // Message type
 
-    private byte[] data;
+    private byte[] data; // Message data
 
-    private int timeOut;
+    private int timeOut; // Timeout length in milliseconds
 
-    private long firstSend=Long.MIN_VALUE;
+    private long firstSend=Long.MIN_VALUE; // Holds time of the first message send attempt
 
-    public static HashMap<Integer, AssuredMessage> instances = new HashMap<>();
+    public static HashMap<Integer, AssuredMessage> instances = new HashMap<>(); // Keeps track of all AssuredMessage instances
 
-    private int numParts;
+    private int numParts; // Number of message parts
 
-    private int curPart = 0;
+    private int curPart = 0; // Current part number
 
-    public boolean sentLast = false;
+    public boolean sentLast = false; // Task has reached the last of the (possibly multi-part) message
 
-    public static final int PREFIX_LENGTH = 1+4+4+1+4+1+1; //16
+    public static final int PREFIX_LENGTH = 1+4+4+1+4+1+1; //16, size of message minus data
 
     public AssuredMessage(byte type, byte[] data, Client client, InetAddress address, int port, int timeOut){
         this.type = type;
@@ -93,7 +95,7 @@ public class AssuredMessage extends TimerTask{
 
         int dataSize = (256-PREFIX_LENGTH)-128;
         if (curPart == numParts-1){
-            dataSize = (byte)((data.length%(256-PREFIX_LENGTH)-128)); // the receiver of the message will add back the 128 to get the actual size
+            dataSize = (byte)((data.length%(256-PREFIX_LENGTH)-128)); // the receiver of the message will add back the 128 to get the actual size, makes it fit within a byte
             sentLast = true;
         }
 

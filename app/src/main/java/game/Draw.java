@@ -20,6 +20,8 @@ import android.util.Log;
 
 import com.mockitleaguemassive.R;
 
+// OpenGL shader, initialization and drawing
+
 public class Draw {
 	
 	
@@ -29,7 +31,7 @@ public class Draw {
 	public static ArrayList<Integer> texHeights;
 	
 	private static final String cubeMapVertexShaderCode = "" +
-			"uniform mat4 uMVPMatrix; \n" +
+			"uniform mat4 uMVPMatrix; \n" + // Model*view*projection matrix
 			"attribute vec3 a_Position; \n" +
 			"varying vec3 v_TexCoordinate; \n" +
 			
@@ -50,12 +52,12 @@ public class Draw {
 			"}";
 	
 	private static final String vertexShaderCode =
-			    "uniform mat4 uMVPMatrix; \n"+       // combined model/view/projection matrix.
-	    		"uniform mat4 uMVMatrix; \n"+       // combined model/view matrix.
+			    "uniform mat4 uMVPMatrix; \n"+ // Model*view*projection matrix
+	    		"uniform mat4 uMVMatrix; \n"+ // Model*view matrix
  
-				"attribute vec4 a_Position \n;"+      // Per-vertex position
-				"attribute vec3 a_Normal \n;"+      // Per-vertex normal
-				"attribute vec2 a_TexCoordinate; \n"+ // Per-vertex texture coordinate
+				"attribute vec4 a_Position \n;"+
+				"attribute vec3 a_Normal \n;"+
+				"attribute vec2 a_TexCoordinate; \n"+
  
 				"varying vec3 v_Position; \n"+
 				"varying vec3 v_Normal; \n"+
@@ -73,8 +75,8 @@ public class Draw {
 				"}";
 
 	private static final String vertexShaderCodeFullbright =
-			"uniform mat4 uMVPMatrix; \n"+
-					"uniform mat4 uMVMatrix; \n"+
+			"uniform mat4 uMVPMatrix; \n"+ // Model*view*projection matrix
+					"uniform mat4 uMVMatrix; \n"+ // Model*view matrix
 
 					"attribute vec4 a_Position \n;"+
 					"attribute vec3 a_Normal \n;"+
@@ -182,8 +184,8 @@ public class Draw {
 					"}";
     
 	private static final String reflectVertexShaderCode =
-		    "uniform mat4 uMVPMatrix; \n"+
-    		"uniform mat4 uMVMatrix; \n"+
+		    "uniform mat4 uMVPMatrix; \n"+ // Model*view*projection matrix
+    		"uniform mat4 uMVMatrix; \n"+ // Model*view matrix
     		"uniform mat4 uMMatrix; \n"+
     		
 			"attribute vec4 a_Position \n;"+
@@ -483,19 +485,17 @@ public class Draw {
 		Matrix.multiplyMV(mLightPosInViewSpace, 0, mViewMatrix, 0, mLightPosInWorldSpace, 0);
 
 		Matrix.multiplyMM(mMVMatrix, 0, mViewMatrix, 0, mModelMatrix, 0);
-		// This multiplies the modelview matrix by the projection matrix,
-		// and stores the result in the MVP matrix
-		// (which now contains model * view * projection).
+
 		Matrix.multiplyMM(mMVPMatrix, 0, mProjectionMatrix, 0, mMVMatrix, 0);
 
 		GLES20.glDepthFunc(GLES20.GL_ALWAYS);
 
-		// Add program to OpenGL environment
+		// Add program to OpenGL
 		GLES20.glUseProgram(mFullbrightProgram);
 
-		checkGlError("Using Program");
+		checkGlError("OpenGL Program Error");
 
-		// get handle to vertex shader's vPosition member
+		// get OpenGL handles
 		mPositionHandle = GLES20.glGetAttribLocation(mFullbrightProgram, "a_Position");
 		mNormalHandle = GLES20.glGetAttribLocation(mFullbrightProgram, "a_Normal");
 		mTexCoorHandle = GLES20.glGetAttribLocation(mFullbrightProgram, "a_TexCoordinate");
@@ -505,26 +505,24 @@ public class Draw {
 		mMVPMatrixHandle = GLES20.glGetUniformLocation(mFullbrightProgram, "uMVPMatrix");
 		mMVMatrixHandle = GLES20.glGetUniformLocation(mFullbrightProgram, "uMVMatrix");
 
-		checkGlError("Getting Handles");
+		checkGlError("Handle Error");
 
 		GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
 
-		// Bind the texture to this unit.
+		// Binds the texture to 0
 		GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textures[texnum]);
 		GLES20.glUniform1i(mTexHandle, 0);
 
-		// Tell the texture uniform sampler to use this texture in the
-		// shader by binding to texture unit 0.
 		//GLES20.glUniform1i(, 0);
 
 		GLES20.glUniform3f(mLightPosHandle, mLightPosInViewSpace[0], mLightPosInViewSpace[1], mLightPosInViewSpace[2]);
 
 		GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertBufInd);
 
-		// Enable a handle to the triangle vertices
+		// Enables a handle to the triangle vertices
 		GLES20.glEnableVertexAttribArray(mPositionHandle);
 
-		// Prepare the triangle coordinate data
+		// triangle coordinate data
 		GLES20.glVertexAttribPointer(
 				mPositionHandle, 3,
 				GLES20.GL_FLOAT, false,
@@ -544,7 +542,7 @@ public class Draw {
 				GLES20.GL_FLOAT, false,
 				stride, (3+3)*4);
 
-		// Apply the projection and view transformation
+		// Applies the projection and view transformation
 		GLES20.glUniformMatrix4fv(mMVPMatrixHandle, 1, false, mMVPMatrix, 0);
 		GLES20.glUniformMatrix4fv(mMVMatrixHandle, 1, false, mMVMatrix, 0);
 		checkGlError("Passing the Matrices in");
@@ -699,14 +697,12 @@ public class Draw {
 				type = GLES20.GL_TEXTURE_CUBE_MAP;
 			}
 			
-			if (types.get(i) == GL10.GL_TEXTURE_2D || types.get(i) == GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_X){
+			if (types.get(i) == GL10.GL_TEXTURE_2D || types.get(i) == GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_X){ // Only gen and bind the first texture of a bound texture unit (cubemap textures all one unit)
 				GLES20.glGenTextures(1, textures, bindCount);
 				GLES20.glBindTexture(type, textures[bindCount++]);
 			}
 
-
-
-			//Create Bilinear Filtered Texture
+			//Create Bilinear filtered texture
 			if (types.get(i) == GL10.GL_TEXTURE_2D) GLES20.glTexParameterf(type, GL10.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR_MIPMAP_NEAREST);
 			else GLES20.glTexParameterf(type, GL10.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
 			GLES20.glTexParameterf(type, GL10.GL_TEXTURE_MAG_FILTER, GL10.GL_LINEAR);
@@ -762,7 +758,7 @@ public class Draw {
 		final int stride = (POSITION_DATA_SIZE) * BYTES_PER_FLOAT;
 		
 		float[] mViewDirMat = Arrays.copyOf(mViewMatrix,16);
-		mViewDirMat[3] = 0;
+		mViewDirMat[3] = 0; // Only leave orientation information
 		mViewDirMat[7] = 0;
 		mViewDirMat[11] = 0;
 		mViewDirMat[12] = 0;
@@ -811,6 +807,7 @@ public class Draw {
 		GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
 	}
 
+	// Draw with reflection
 	public static void drawReflection(int vertBufInd, int faceBufInd, int indexCount, float[] mViewMatrix, float[] mProjectionMatrix, float[] mModelMatrix, int texnum, int refnum){
 	    int mPositionHandle;
 	    int mNormalHandle;
@@ -913,7 +910,4 @@ public class Draw {
 		Draw.camposy = camposy;
 		Draw.camposz = camposz;
 	}
-
-
-
 }

@@ -22,29 +22,28 @@ import java.util.HashMap;
  * @author Neil
  */
 public class Entity {
-    protected ArrayList<Vector3> verts;
+    protected ArrayList<Vector3> verts; // Vertices
     protected ArrayList<ArrayList<Integer>> faces;
     protected ArrayList<Vector3> normals;
     protected ArrayList<Float> uv;
     
-    protected PhysObject physObj;
+    protected PhysObject physObj; // Bullet physObj
 
 	protected float mass;
 
-    public float[] mat;
-    public float[] prevMat;
+    public float[] mat; // OpenGL mat
+    public float[] prevMat; // previous OpenGL mat
 
-    FloatBuffer vertexBuffer;
-	ByteBuffer indexBuffer;
+    FloatBuffer vertexBuffer; // for vertices
+	ByteBuffer indexBuffer; // for indices
     
-	int texnum;
+	int texnum; // OpenGL texture unit with which to draw
 
-	boolean fullBright;
+	boolean fullBright; // No lighting?
 
 	float curPosX=0;
 	float curPosY=0;
 	float curPosZ=0;
-
     
 	static final int POSITION_DATA_SIZE = 3;	
 
@@ -75,10 +74,10 @@ public class Entity {
 
 	private boolean isLocal = true;
 
-	public int uniqueID = -1;
+	public int uniqueID = -1; // Unique ID on the network
 
-	public static HashMap<Integer, Entity> ids = new HashMap<>();
-	public static ArrayList<AddressPort> addressPorts = new ArrayList<>();
+	public static HashMap<Integer, Entity> ids = new HashMap<>(); // Unique ID index
+	public static ArrayList<AddressPort> addressPorts = new ArrayList<>(); // All network AddressPorts
 
 	private AddressPort addressPort;
 
@@ -198,7 +197,7 @@ public class Entity {
 		}
     }
     
-    private void createBuffers(){
+    private void createBuffers(){ // Initialize OpenGL buffers
 		final int vertBuf[] = new int[1];
     	final int faceBuf[] = new int[1];
 
@@ -316,7 +315,7 @@ public class Entity {
 		}
 	}
 
-	public void stepBack(){
+	public void stepBack(){ // Reverts Entity, intended to fix any odd Bullet NaN issues
 		mat = Arrays.copyOf(prevMat,16);
 
 		curVelX = prevVelX;
@@ -483,7 +482,7 @@ public class Entity {
 		return out;
 	}*/
 	
-	private class Edge{
+	private class Edge{ // Pathfinding graph edge
 		@Override
 		public int hashCode() {
 			final int prime = 31;

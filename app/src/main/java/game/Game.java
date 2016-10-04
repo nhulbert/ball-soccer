@@ -23,10 +23,10 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class Game implements Renderer {
-	   private int canvas_width;  // width of the screen
-	   private int canvas_height; // height of the screen
-	   
-	   private Surface surface;
+   private int canvas_width;  // width of the screen
+   private int canvas_height; // height of the screen
+
+   private Surface surface;
 
 	private Context context;
 	
@@ -36,42 +36,39 @@ public class Game implements Renderer {
 	}
 
 	private float[] mViewMatrix = new float[16];
-	private float[] mInverseView = new float[16];
+	private float[] mInverseView = new float[16]; // Inverse view matrix
 
 	private float[] mProjectionMatrix = new float[16];
-	private float[] mInverseProjection = new float[16];
+	private float[] mInverseProjection = new float[16]; // Inverse projection matrix
 
-	World world;
+	World world; // Static physics and OpenGL objects
 	
-	ArrayList<Entity> entities;
+	ArrayList<Entity> entities; // Complete entity list
 
-	int[] entCountDowns = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	static final int COOLDOWN = 60;
+	int[] entCountDowns = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Holds cooldown counters to prevent receiving remote entities' physics data after a local correction
+	static final int COOLDOWN = 60; // Aforementioned cooldown time, in game frames
 
-	float angleY = (float)Math.PI/6;
+	float angleY = (float)Math.PI/6; // Camera elevation angle
 	
-	boolean[] isDown = {false, false};
+	boolean[] isDown = {false, false}; // is finger down?
 	
-	float ratio;
-	float left;
-	float right;
+	float ratio; // view ratio
+	float left; // left screen coord
+	float right; // etc.
 	float bottom;
 	float top;
 	float near;
 	float far;
 	
 	private final float[] mLightPosInWorldSpace = {81,60,81,1};
-	
+
+	// Camera position
 	float camposx;
 	float camposy;
 	float camposz;
 
-	Float bufBPx=null;
-	Float bufBPy=null;
-	Float bufBPz=null;
-
 	boolean isServer = false;
-	boolean selected = false;
+	boolean selected = false; // is Client/Server choice selected?
 
 	Entity clientButton;
 	Entity serverButton;
@@ -82,22 +79,23 @@ public class Game implements Renderer {
 	Client client;
 	Server server;
 
-	boolean resolved = false;
-	boolean connected = false;
-	boolean ready = false;
+	// Keeps track of program state
+	boolean resolved = false; // Service found on the network by client
+	boolean connected = false; // Server and client are connected
+	boolean ready = false; // Game started
 
-	ServiceListener serviceListener;
+	ServiceListener serviceListener; // Service listener for client to connect to server
 
-	int localScore = 0;
-	int networkScore = 0;
+	int localScore = 0; // Our score
+	int networkScore = 0; // Their score
 
 	float[] prevPos = new float[2];
 
-	int scoreCooldown = 0;
+	int scoreCooldown = 0; // Cooldown so ball-goal collision not processed multiple times
 
-	int life = 0;
+	int life = 0; // Game uptime in frames, up to the # of frames that Bullet will accept changes of physics data, allows new Client initialization
 
-	int sendCounter = 0;
+	int sendCounter = 0; // Keeps track of how many frames since last network send, sending every frame is unnecessary
 
 	/**
 	 * The Surface is created/init()
@@ -158,27 +156,6 @@ public class Game implements Renderer {
 			camposz = (float) (10 * Math.cos(angleY) * dir.z) + e.curPosZ;
 
 			Draw.setCamPos(camposx, camposy, camposz);
-
-			final float c = 0.9f;
-			final float ic = 1-c;
-			if (bufBPx != null){
-				bufBPx = c*bufBPx+ic*ball.curPosX;
-		}
-			else{
-				bufBPx = ball.curPosX;
-			}
-			if (bufBPy != null){
-				bufBPy = c*bufBPy+ic*ball.curPosY;
-			}
-			else{
-				bufBPy = ball.curPosY;
-			}
-			if (bufBPz != null){
-				bufBPz = c*bufBPz+ic*ball.curPosZ;
-			}
-			else{
-				bufBPz = ball.curPosZ;
-			}
 
 			Matrix.setLookAtM(mViewMatrix, 0, camposx, camposy, camposz, ball.curPosX, ball.curPosY, ball.curPosZ, 0, 1f, 0);
 
@@ -269,9 +246,10 @@ public class Game implements Renderer {
 	
 	private void physUpdate() {
 		Entity p0 = entities.get(0); // Local disc
-		Entity p1 = entities.get(1); // Network disc
-		Entity ball = entities.get(2);
+		Entity p1 = entities.get(1); // First Network disc
+		Entity ball = entities.get(2); // Ball
 
+		// Adds new players for the Server or Client
 		if (isServer){
 			if (server.isNewPlayer()){
 				int pn = server.getNumberOfPlayers();
@@ -378,6 +356,7 @@ public class Game implements Renderer {
 			}
 		}
 
+		//Increments entCountDowns if the counter is active
 		for (int i=0; i<entCountDowns.length; i++){
 			if (entCountDowns[i] != 0){
 				entCountDowns[i]++;
@@ -386,8 +365,9 @@ public class Game implements Renderer {
 			}
 		}
 
+		//Updates local and remote discs on server and client
 		float[] mat;
-		if (isServer){											//Updates network disc
+		if (isServer){
 			for (int i=0; i<12; i++) {
 				Entity e = Entity.ids.get(i);
 				if (e != null) {
@@ -440,7 +420,7 @@ public class Game implements Renderer {
 				}
 			}
 		}
-		else{											        //Updates network disc
+		else{
 			for (int i=0; i<12; i++) {
 				Entity e = Entity.ids.get(i);
 				if (e != null) {
@@ -493,6 +473,7 @@ public class Game implements Renderer {
 			}
 		}
 
+		// Fixes local discs if they falls off the map somehow
 		if (p0.curPosY < -10){
 			p0.setPosition(new Vector3(p0.curPosX,30,p0.curPosZ));
 			p0.update();
@@ -503,6 +484,7 @@ public class Game implements Renderer {
 			ball.update();
 		}
 
+		// Handles input
 		if (isDown[0]) {
 			float[] throwVec = {((float) surface.curpos.get(0).x - (prevPos[0])) / canvas_width, 0, ((float) surface.curpos.get(0).y - (prevPos[1]))/canvas_width, 1};
 
@@ -525,20 +507,21 @@ public class Game implements Renderer {
 			}
 		}
 
+		// Updates Bullet physics world
 		world.update(System.currentTimeMillis());
-
 		for (Entity e : entities){
 			e.update();
 		}
 
+		// Fixes local discs if Bullet weirds out
 		if (Float.isNaN(p0.curPosX+p0.curVelX) || Float.isInfinite(p0.curPosX+p0.curVelX)){
 			p0.stepBack();
 		}
-
 		if (isServer && (Float.isNaN(ball.curPosX+ball.curVelX) || Float.isInfinite(ball.curPosX+ball.curVelX))){
 			ball.stepBack();
 		}
 
+		// Increments the cooldown after scoring in the event that it's active
 		if (scoreCooldown != 0){
 			scoreCooldown++;
 			if (scoreCooldown == 30){
@@ -546,6 +529,7 @@ public class Game implements Renderer {
 			}
 		}
 
+		// Sends collision correction to remote discs a few frames after the local collision
 		for (int i=0; i<entCountDowns.length; i++){
 			Entity nonlocal = Entity.ids.get(i);
 			if (entCountDowns[i] == 5 && !nonlocal.isLocal()){
@@ -586,6 +570,7 @@ public class Game implements Renderer {
 			}
 		}
 
+		// Goes through collisions detected by Bullet and adds extra momentum to the ball
 		for (int h=0; h<entities.size()-1; h++){
 			Entity a = entities.get(h);
 			if (a.getUniqueID() != -1) for (int i=h+1; i<entities.size(); i++) {
@@ -620,6 +605,7 @@ public class Game implements Renderer {
 			}
 		}
 
+		// For server to detect goals, respond to them accordingly, and notify clients
 		boolean cs = world.clientScored(ball);
 		boolean ss = world.serverScored(ball);
 
@@ -648,8 +634,20 @@ public class Game implements Renderer {
 			p1.zeroVelocities();
 			ball.setPosition(new Vector3(81,30,81));
 			ball.zeroVelocities();
+
+			for (int i=3; i<entities.size(); i+=2){
+				Entity e = Entity.ids.get(i);
+				e.setPosition(new Vector3(151f,30f,81f+10*i));
+				e.zeroVelocities();
+			}
+			for (int i=4; i<entities.size(); i+=2){
+				Entity e = Entity.ids.get(i);
+				e.setPosition(new Vector3(11f,30f,81f+10*i));
+				e.zeroVelocities();
+			}
 		}
 
+		// Sends the telemetry for all local discs to all other players
 		if (sendCounter == 1) {
 			for (Entity e : entities) {
 				if (e.getUniqueID() != -1 && e.isLocal()) {
@@ -697,11 +695,10 @@ public class Game implements Renderer {
 				}
 			}
 		}
-
 		sendCounter++;
-
 		if (sendCounter == 2) sendCounter = 0;
 
+		// For client to respond to a server-sent score message
 		if (!isServer){
 			Integer score = client.getScore();
 			if (score != null){
@@ -743,6 +740,7 @@ public class Game implements Renderer {
 		if (life < 5) life++;
 	}
 
+	// Renders the graphical world
 	private void render() {
         world.draw(mViewMatrix, mProjectionMatrix);
 
@@ -753,9 +751,7 @@ public class Game implements Renderer {
 		drawScores();
 	}
 	
-	/**
-	 * If the surface changes, reset the view
-	 */
+	// resets the view on changed surface
 	public void onSurfaceChanged(GL10 gl, int width, int height) {
 		canvas_width = width;
 		canvas_height = height;
@@ -776,6 +772,7 @@ public class Game implements Renderer {
 		System.out.print("yo");
 	}
 
+	// To initialize the disc entities
 	private void addBalls(){
 		ArrayList<Vector3> tempVerts = new ArrayList<>();
 		ArrayList<ArrayList<Integer>> tempFaces = new ArrayList<>();
@@ -1006,6 +1003,7 @@ public class Game implements Renderer {
 		//entities.get(1).makeKinematic();
 	}
 
+	// Adds the colored backstops for each team's goal
 	private void addBackStops(){
 		float miny = 0;
 		float maxy = World.scale*World.EDGE_WIDTH;
@@ -1052,6 +1050,7 @@ public class Game implements Renderer {
 		entities.add(new Entity(tempVerts, trans, 0f, tempFaces, tempNormals, tempUV, 13, false, null, null, false, false, -1, null));
 	}
 
+	// For the generation of a sphere approximating triangle mesh with arbitrary resolution
 	private static class VectwBool{
 		Vector3 v;
 		boolean added;
@@ -1061,6 +1060,7 @@ public class Game implements Renderer {
 		}
 	}
 
+	// An ordered pair of Vector3s
 	private static class VectDouble{
 		private static final float SQRT6D2 = 1.224744871391589049098642037352945695982973740f;
 
@@ -1107,7 +1107,7 @@ public class Game implements Renderer {
 
 		boolean added = false;
 	}
-
+	
     public void handleWorldInput(){
 		for (int i=0; i<2; i++){
 			if (surface.processDown.get(i)){
@@ -1213,6 +1213,7 @@ public class Game implements Renderer {
 		}
 	}
 
+	// Add the client/server selection buttons
 	public void addButtons() {
 		float minx = 1;
 		float maxx = 6;
@@ -1255,6 +1256,7 @@ public class Game implements Renderer {
 		serverButton = new Entity(tempVerts, trans, 0, tempFaces, tempNormals, tempUV, 17, null, null);
 	}
 
+	// Draws the player scores on top of the screen
 	private void drawScores(){
 		float[] ident = {1, 0, 0, 0,
 				0, 1, 0, 0,
@@ -1285,6 +1287,7 @@ public class Game implements Renderer {
 		}
 	}
 
+	// Closes all open networking threads
 	public void shutDownNetworking(){
 		if (server != null) server.close();
 		if (client != null) client.close();

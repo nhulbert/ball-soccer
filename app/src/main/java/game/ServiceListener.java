@@ -6,6 +6,8 @@ import android.net.nsd.NsdServiceInfo;
 
 import java.net.InetAddress;
 
+// The service listener used by the client to discover the server's service
+
 public class ServiceListener {
     private NsdManager.ResolveListener mResolveListener;
     private NsdServiceInfo mService;

@@ -3,9 +3,8 @@ package game;
 import java.net.InetAddress;
 import java.util.Arrays;
 
-/**
- * Created by Neil on 8/29/2016.
- */
+// Specifies exactly a socket's location on a network
+
 public class AddressPort {
     InetAddress address;
     int port;

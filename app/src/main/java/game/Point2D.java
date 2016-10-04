@@ -2,6 +2,8 @@ package game;
 
 import java.io.Serializable;
 
+// Point2D implementation
+
 public class Point2D implements Serializable{
     /**
 	 * 

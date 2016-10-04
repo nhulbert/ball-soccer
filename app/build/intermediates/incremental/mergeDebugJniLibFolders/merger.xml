@@ -1,2 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merger version="3"><dataSet config="main"><source path="C:\Users\Neil\StudioProjects\BallSoccer\app\src\main\jniLibs"/><source path="C:\Users\Neil\StudioProjects\BallSoccer\app\src\main\libs"><file name="armeabi-v7a/libbullet.so" path="C:\Users\Neil\StudioProjects\BallSoccer\app\src\main\libs\armeabi-v7a\libbullet.so"/></source></dataSet><dataSet config="debug"><source path="C:\Users\Neil\StudioProjects\BallSoccer\app\src\debug\jniLibs"/></dataSet></merger>

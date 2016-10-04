@@ -4,6 +4,8 @@ import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 
+// Intended for the Server, this registers a service on the local network to which the client can connect to receive the server's exact socket location
+
 public class Broadcaster{
     Context context;
 

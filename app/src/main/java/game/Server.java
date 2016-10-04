@@ -34,9 +34,9 @@ public class Server extends Thread {
     
     private byte[] current=null;
     
-    private Timer attemptTimer;  // Used to send scheduled packets
+    private Timer attemptTimer;  // Timer for handshake messages
 
-    public static final byte CONNECT1 = 12;
+    public static final byte CONNECT1 = 12; // Message types
 	public static final byte ACK = 13;
     public static final byte CONNECT2 = 14;
     public static final byte HANDSHAKE = 15;
@@ -50,23 +50,24 @@ public class Server extends Thread {
     public static final byte NEWPLAYER = 14;
     public static final byte INITIALIZATION = 15;
 
-    public static final byte[] connect2 = {HANDSHAKE,Server.CONNECT2};
-    public static final byte[] ack = {HANDSHAKE,Server.ACK};
+    public static final byte[] connect2 = {HANDSHAKE,Server.CONNECT2}; // 2nd handshake message sent by client
+    public static final byte[] ack = {HANDSHAKE,Server.ACK}; // Message acknowledging initial client connection
 
     public boolean connected = false;
 
-    ArrayList<Integer> assuredCodes = new ArrayList<>();
-    private int assuredCodesInd=0;
+    ArrayList<Integer> assuredCodes = new ArrayList<>(); // A circular buffer of the previous unique AssuredMessage messages sent, checked to prevent receiving the same message twice
+    private int assuredCodesInd=0; // Buffer index
 
-    private Broadcaster broadcaster;
+    private Broadcaster broadcaster; // Registers service on the local network for client to connect to
 
     private ByteBuffer level = ByteBuffer.allocateDirect(World.XSIZE *World.YSIZE *4+8);
 
     private int levelDataCounter = 0;
     public boolean levelDownloaded = false;
 
-    public boolean levelSent = false;
+    public boolean levelSent = false; // Has the level been sent
 
+    // Variables storing network disc physics information
     private boolean[] discDataIsNew = {false,false,false,false,false,false,false,false,false,false,false,false};
     private float[][] discMatrix = new float[12][16];
     private float[][] discVelocities = new float[12][6];
@@ -74,20 +75,25 @@ public class Server extends Thread {
     public static final int DISCSENDMAX = 200000;
     private int lastDiscReceivedNum = DISCSENDMAX-1;
 
+    // Variables storing local disc correction information
     private float[][] discCorrection = new float[12][];
     private boolean[] correctDiscs = {false,false,false,false,false,false,false,false,false,false,false,false};
     private int discCorCounter = 0;
     private int lastDiscCorReceivedNum = Server.DISCSENDMAX-1;
 
+    // Holds the exact locations of all connected sockets
     private ArrayList<AddressPort> connectedAddressPorts = new ArrayList<>();
 
+    // Holds the handshake stages of each connecting client
     private HashMap<AddressPort, Integer> connectStages = new HashMap<>();
 
+    // Last connected socket info
     private InetAddress lastConnected = null;
     private int lastConnectedPort =-1;
 
     private final int localPort;
 
+    // New player addition information
     private int numberOfPlayers = 2; //Starts at the number of players present after the initial connection
     private boolean isNewPlayer = false;
     private byte[] newPlayerAddress = new byte[4];
@@ -139,7 +145,7 @@ public class Server extends Thread {
                     final InetAddress curAddress = in.getAddress();
 
                     switch(current[0]){
-                    	case Server.HANDSHAKE:
+                    	case Server.HANDSHAKE: // Handshake logic
                             boolean contains = false;
                             for (AddressPort a : connectStages.keySet()){
                                 if (Arrays.equals(a.address.getAddress(),curAddress.getAddress())){
@@ -203,7 +209,7 @@ public class Server extends Thread {
                                 }
 	                    	}
 	                    	break;
-                        case Server.ASSURED:
+                        case Server.ASSURED: // Packet from AssuredMessage
                             if (connected){
                                 boolean received = false;
 
@@ -223,7 +229,7 @@ public class Server extends Thread {
 
                                 if (!assuredCodes.contains(code)){
                                     switch(type) {
-                                        case Server.LEVEL:
+                                        case Server.LEVEL: // Level initialization message
                                             received = true;
                                             if (part == levelDataCounter) {
                                                 level.put(current, AssuredMessage.PREFIX_LENGTH, size);
@@ -242,7 +248,7 @@ public class Server extends Thread {
                                                 }
                                             }
                                             break;
-                                        case Server.DISC_CORRECTION:
+                                        case Server.DISC_CORRECTION: // Correction of a local disc
                                             received = true;
                                             float[] dc = new float[22];
                                             bb = ByteBuffer.wrap(current,AssuredMessage.PREFIX_LENGTH,8);
@@ -269,7 +275,7 @@ public class Server extends Thread {
                                 if (received) send(ByteBuffer.allocate(9).order(ByteOrder.BIG_ENDIAN).put(Server.ASSURED_ACK).putInt(code).putInt(part).array(), curAddress, returnPort); //Acknowledge the message
                             }
                             break;
-                        case Server.ASSURED_ACK:
+                        case Server.ASSURED_ACK: // Acknowledgement of an assured message
                             if (connected){
                                 ByteBuffer bb = ByteBuffer.wrap(current,1,8).order(ByteOrder.BIG_ENDIAN);
                                 int code = bb.getInt();
@@ -290,7 +296,7 @@ public class Server extends Thread {
                                 }
                             }
                             break;
-                        case Server.DISC_MATRIX:
+                        case Server.DISC_MATRIX: // Physics state of a remote disc
                             if (connected) {
                                 ByteBuffer bb = ByteBuffer.wrap(current,1,8);
                                 int temp = bb.getInt();

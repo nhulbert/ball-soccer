@@ -14,10 +14,8 @@ import org.siprop.bullet.RigidBody;
 import org.siprop.bullet.interfaces.Shape;
 import org.siprop.bullet.util.Vector3;
 
-/**
- *
- * @author Neil
- */
+// The physics object in the Java portion of the JNI wrapper
+
 public class PhysObject {
     public Shape shape;
     public MotionState motionState;
