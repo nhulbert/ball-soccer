@@ -22,6 +22,8 @@ import java.util.Objects;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
+// Contains the main game loop, game logic, and networked physics
+
 public class Game implements Renderer {
    private int canvas_width;  // width of the screen
    private int canvas_height; // height of the screen
@@ -1107,7 +1109,7 @@ public class Game implements Renderer {
 
 		boolean added = false;
 	}
-	
+
     public void handleWorldInput(){
 		for (int i=0; i<2; i++){
 			if (surface.processDown.get(i)){
