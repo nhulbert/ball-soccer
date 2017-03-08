@@ -54,7 +54,7 @@ public class Entity {
 	static final int STRIDE = POSITION_DATA_SIZE + NORMAL_DATA_SIZE + TEXTURE_COORDINATE_DATA_SIZE;
 	
 	static HashMap<Integer,Integer> bufInds = new HashMap<>();
-	
+
 	int vertBufInd;
 	int faceBufInd;
 
@@ -73,6 +73,7 @@ public class Entity {
 	public float prevAngVelZ;
 
 	private boolean isLocal = true;
+    public boolean isAI = false;
 
 	public int uniqueID = -1; // Unique ID on the network
 
@@ -130,7 +131,7 @@ public class Entity {
 		}
 	}
 
-	public Entity(ArrayList<Vector3> verts, float[] trans, float mass, ArrayList<ArrayList<Integer>> faces, ArrayList<Vector3> normals, ArrayList<Float> uv, int texnum, boolean fullBright, Integer bufInd, World world, boolean convex, boolean local, int uniqueID, AddressPort addressPort){
+	public Entity(ArrayList<Vector3> verts, float[] trans, float mass, ArrayList<ArrayList<Integer>> faces, ArrayList<Vector3> normals, ArrayList<Float> uv, int texnum, boolean fullBright, Integer bufInd, World world, boolean convex, boolean local, int uniqueID, AddressPort addressPort, boolean isAI){
 		this.verts = verts;
 		this.faces = faces;
 		this.normals = normals;
@@ -143,6 +144,7 @@ public class Entity {
 		this.isLocal = local;
 
 		this.uniqueID = uniqueID;
+        this.isAI = isAI;
 
 		if (bufInd == null || !bufInds.keySet().contains(bufInd)){
 			createBuffers();
@@ -282,7 +284,7 @@ public class Entity {
 		PhysObject.bullet.makeDynamic(physObj.rigidBody, mass);
 	}
 
-	public void update() {
+	public void update(ArrayList<Entity> entities) {
 		if (physObj != null){
 			Transform t = physObj.rigidBody.motionState.resultSimulation;
 

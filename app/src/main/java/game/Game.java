@@ -31,7 +31,9 @@ public class Game implements Renderer {
    private Surface surface;
 
 	private Context context;
-	
+
+	private long recordStart;
+
 	public Game(Context context, Surface surface) {
 		this.context = context;
 		this.surface = surface;
@@ -71,12 +73,15 @@ public class Game implements Renderer {
 
 	boolean isServer = false;
 	boolean selected = false; // is Client/Server choice selected?
+	boolean isLocal = false;
 
 	Entity clientButton;
 	Entity serverButton;
+	Entity singleButton;
 
 	boolean clientButtonDownInBounds = false;
 	boolean serverButtonDownInBounds = false;
+	boolean singleButtonDownInBounds = false;
 
 	Client client;
 	Server server;
@@ -91,6 +96,9 @@ public class Game implements Renderer {
 	int localScore = 0; // Our score
 	int networkScore = 0; // Their score
 
+	boolean displayCountDown = true;
+	Long countDownStartTime = null;
+
 	float[] prevPos = new float[2];
 
 	int scoreCooldown = 0; // Cooldown so ball-goal collision not processed multiple times
@@ -99,11 +107,14 @@ public class Game implements Renderer {
 
 	int sendCounter = 0; // Keeps track of how many frames since last network send, sending every frame is unnecessary
 
+	AIController aiController;
+	boolean liftBall = true;
+
 	/**
 	 * The Surface is created/init()
 	 */
 	public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        GLES20.glClearColor(0.1f, 0f, 0.9f, 0.0f);
+        GLES20.glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
         GLES20.glClearDepthf(1.0f);
         //GLES20.glEnable(GLES20.GL_CULL_FACE);
         GLES20.glEnable(GL10.GL_DEPTH_TEST);
@@ -134,8 +145,10 @@ public class Game implements Renderer {
 		addBalls();
 		addBackStops();
 		for (Entity e : entities){
-			e.update();
+			e.update(entities);
 		}
+
+		aiController = new AIController(entities);
 
 		Draw.setLightPos(mLightPosInWorldSpace);
 	}
@@ -173,7 +186,23 @@ public class Game implements Renderer {
 
  			render();
 
-			physUpdate();
+			if (!displayCountDown || countDownStartTime == null){
+				if (liftBall && life >= 5){
+					ball.applyCentralImpulse(new Vector3(0f,20f,5f));
+					liftBall = false;
+				}
+
+				physUpdate();
+			}
+
+			if (life >= 5 && displayCountDown){
+				if (countDownStartTime == null) countDownStartTime = System.currentTimeMillis();
+				else {
+					if (System.currentTimeMillis()-countDownStartTime > 3000) displayCountDown = false;
+					else drawCountDown();
+				}
+			}
+			if (life < 100) life++;
 		}
 		else{
 			handleButtonInput();
@@ -195,9 +224,16 @@ public class Game implements Renderer {
 					0,1,0,0,
 					0,0,1,0,
 					0,0,0,1},mProjectionMatrix);
-
+			if (singleButtonDownInBounds) singleButton.draw(new float[]{1,0,0,0,
+					0,1,0,0,
+					0,0,1,0,
+					0,0,0,1},mProjectionMatrix,true);
+			else singleButton.draw(new float[]{1,0,0,0,
+					0,1,0,0,
+					0,0,1,0,
+					0,0,0,1},mProjectionMatrix);
 			if (selected){
-				if (!connected) {
+				if (!isLocal && !connected) {
 					if (!isServer && !resolved && serviceListener.resolved) {
 						resolved = true;															//state #1
 						//try {
@@ -251,109 +287,112 @@ public class Game implements Renderer {
 		Entity p1 = entities.get(1); // First Network disc
 		Entity ball = entities.get(2); // Ball
 
-		// Adds new players for the Server or Client
-		if (isServer){
-			if (server.isNewPlayer()){
-				int pn = server.getNumberOfPlayers();
-
-				int wb = pn;
-				if (wb == 1) wb = 2;
-
-				int texnum = 13;
-				if (wb%2 == 0) texnum = 14;
-
-				float[] trans;
-
-				if (wb%2 == 0){
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							10f,30f,81f+10*wb,1};
-				}
-				else{
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							151f,30f,81f+10*wb,1};
-				}
-
-				AddressPort addressPort = null;
-				try {
-					addressPort = new AddressPort(InetAddress.getByAddress(server.getNewPlayerAddress()),server.getNewPlayerPort());
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-				}
-
-				Entity e = new Entity(p0.verts, trans, 1f, p0.faces, p0.normals, p0.uv, texnum, false, null, world, true, false, pn, /*InetAddress.getByName("10.0.2.6")*/ addressPort);
-				entities.add(e);
+		if (isLocal){
+			if (aiController != null && life > 99){
+				aiController.update();
 			}
 		}
-		else{
-			if (client.isNewPlayer() && life == 5){
-				int pn = client.getNumberOfPlayers();
+		else {
+			// Adds new players for the Server or Client
+			if (isServer) {
+				if (server.isNewPlayer()) {
+					int pn = server.getNumberOfPlayers();
 
-				int wb = pn;
-				if (wb == 1) wb = 2;
+					int wb = pn;
+					if (wb == 1) wb = 2;
 
-				int texnum = 13;
+					int texnum = 13;
+					if (wb % 2 == 0) texnum = 14;
 
+					float[] trans;
 
-				float[] trans;
+					if (wb % 2 == 0) {
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								10f, 30f, 81f + 10 * wb, 1};
+					} else {
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								151f, 30f, 81f + 10 * wb, 1};
+					}
 
-				if (wb%2 == 0){
-					texnum = 14;
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							10f,30f,81f+10*wb,1};
+					AddressPort addressPort = null;
+					try {
+						addressPort = new AddressPort(InetAddress.getByAddress(server.getNewPlayerAddress()), server.getNewPlayerPort());
+					} catch (UnknownHostException e) {
+						e.printStackTrace();
+					}
+
+					Entity e = new Entity(p0.verts, trans, 1f, p0.faces, p0.normals, p0.uv, texnum, false, null, world, true, false, pn, /*InetAddress.getByName("10.0.2.6")*/ addressPort, false);
+					entities.add(e);
 				}
-				else{
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							151f,30f,81f+10*wb,1};
+			} else {
+				if (client.isNewPlayer() && life >= 5) {
+					int pn = client.getNumberOfPlayers();
+
+					int wb = pn;
+					if (wb == 1) wb = 2;
+
+					int texnum = 13;
+
+
+					float[] trans;
+
+					if (wb % 2 == 0) {
+						texnum = 14;
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								10f, 30f, 81f + 10 * wb, 1};
+					} else {
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								151f, 30f, 81f + 10 * wb, 1};
+					}
+
+					AddressPort addressPort = null;
+					try {
+						addressPort = new AddressPort(InetAddress.getByAddress(client.getNewPlayerAddress()), client.getNewPlayerPort());
+					} catch (UnknownHostException e) {
+						e.printStackTrace();
+					}
+
+					Entity e = new Entity(p0.verts, trans, 1f, p0.faces, p0.normals, p0.uv, texnum, false, null, world, true, false, pn, /*InetAddress.getByName("10.0.2.6")*/ addressPort,false);
+					entities.add(e);
 				}
 
-				AddressPort addressPort = null;
-				try {
-					addressPort = new AddressPort(InetAddress.getByAddress(client.getNewPlayerAddress()),client.getNewPlayerPort());
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-				}
+				if (client.toInitialize() && life >= 5) {
+					int pn = client.getInitializePlayerNum();
 
-				Entity e = new Entity(p0.verts, trans, 1f, p0.faces, p0.normals, p0.uv, texnum, false, null, world, true, false, pn, /*InetAddress.getByName("10.0.2.6")*/ addressPort);
-				entities.add(e);
-			}
+					int texnum = 13;
 
-			if (client.toInitialize() && life == 5){
-				int pn = client.getInitializePlayerNum();
+					float[] trans;
 
-				int texnum = 13;
+					if (pn % 2 == 0) {
+						texnum = 14;
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								11f, 30f, 81f + 10 * pn, 1};
+					} else {
+						trans = new float[]{1, 0, 0, 0,
+								0, 1, 0, 0,
+								0, 0, 1, 0,
+								151f, 30f, 81f + 10 * pn, 1};
+					}
 
-				float[] trans;
+					p0.setMat(trans);
+					p0.setID(pn);
+					p0.setTexnum(texnum);
 
-				if (pn%2 == 0){
-					texnum = 14;
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							11f,30f,81f+10*pn,1};
-				}
-				else{
-					trans = new float[]{1,0,0,0,
-							0,1,0,0,
-							0,0,1,0,
-							151f,30f,81f+10*pn,1};
-				}
-
-				p0.setMat(trans);
-				p0.setID(pn);
-				p0.setTexnum(texnum);
-
-				Entity.ids.clear();
-				for (Entity e : entities){
-					int id = e.getUniqueID();
-					if (id != -1) Entity.ids.put(id,e);
+					Entity.ids.clear();
+					for (Entity e : entities) {
+						int id = e.getUniqueID();
+						if (id != -1) Entity.ids.put(id, e);
+					}
 				}
 			}
 		}
@@ -367,123 +406,122 @@ public class Game implements Renderer {
 			}
 		}
 
-		//Updates local and remote discs on server and client
-		float[] mat;
-		if (isServer){
-			for (int i=0; i<12; i++) {
-				Entity e = Entity.ids.get(i);
-				if (e != null) {
-					if (e.isLocal()) {
-						if (server.newCorrectionAvailable(i)) {               //Applies any pending network collision correction before forces are added
-							float[] dc = server.getDiscCorrection(i);
+		if (!isLocal) {
+			//Updates local and remote discs on server and client
+			float[] mat;
+			if (isServer) {
+				for (int i = 0; i < 12; i++) {
+					Entity e = Entity.ids.get(i);
+					if (e != null) {
+						if (e.isLocal()) {
+							if (server.newCorrectionAvailable(i)) {               //Applies any pending network collision correction before forces are added
+								float[] dc = server.getDiscCorrection(i);
 
-							float[] dcMat = Arrays.copyOfRange(dc, 0, 16);
+								float[] dcMat = Arrays.copyOfRange(dc, 0, 16);
 
-							//if (dcMat[0] != Float.NaN) {
+								//if (dcMat[0] != Float.NaN) {
 								e.setMat(dcMat);
-							//}
+								//}
 
-							e.zeroVelocities();
-							e.setLinVel(new Vector3(dc[16], dc[17], dc[18]));
-							e.setAngVel(new Vector3(dc[19], dc[20], dc[21]));
-							e.update();
-						}
-					} else{
-						if (entCountDowns[i] == 0){
-							mat = server.getDiscMatrix(i);
-							if (mat != null) {
-								e.setMat(mat);
-
-								float[] v = server.getVelocities(i);
 								e.zeroVelocities();
-								e.setLinVel(new Vector3(v[0], v[1], v[2]));
-								e.setAngVel(new Vector3(v[3], v[4], v[5]));
+								e.setLinVel(new Vector3(dc[16], dc[17], dc[18]));
+								e.setAngVel(new Vector3(dc[19], dc[20], dc[21]));
+								e.update(entities);
+							}
+						} else {
+							if (entCountDowns[i] == 0) {
+								mat = server.getDiscMatrix(i);
+								if (mat != null) {
+									e.setMat(mat);
+
+									float[] v = server.getVelocities(i);
+									e.zeroVelocities();
+									e.setLinVel(new Vector3(v[0], v[1], v[2]));
+									e.setAngVel(new Vector3(v[3], v[4], v[5]));
+								}
+							} else {
+								server.getDiscMatrix(i);
+								server.getVelocities(i);
+
+								/*if (mat != null && entCountDowns[i] >= COOLDOWN-AVGTIME){
+									float t = (entCountDowns[i]-(COOLDOWN-AVGTIME))/(float)AVGTIME;
+
+									mat[12] = t*mat[12]+(1-t)*e.curPosX;
+									mat[13] = t*mat[13]+(1-t)*e.curPosY;
+									mat[14] = t*mat[14]+(1-t)*e.curPosZ;
+
+									e.setMat(mat);
+
+									e.zeroVelocities();
+									e.setLinVel(new Vector3(v[0], v[1], v[2]));
+									e.setAngVel(new Vector3(v[3], v[4], v[5]));
+								}*/
 							}
 						}
-						else{
-							server.getDiscMatrix(i);
-							server.getVelocities(i);
+					}
+				}
+			} else {
+				for (int i = 0; i < 12; i++) {
+					Entity e = Entity.ids.get(i);
+					if (e != null) {
+						if (e.isLocal()) {
+							if (client.newCorrectionAvailable(i)) {               //Applies any pending network collision correction before forces are added
+								float[] dc = client.getDiscCorrection(i);
 
-							/*if (mat != null && entCountDowns[i] >= COOLDOWN-AVGTIME){
-								float t = (entCountDowns[i]-(COOLDOWN-AVGTIME))/(float)AVGTIME;
+								float[] dcMat = Arrays.copyOfRange(dc, 0, 16);
 
-								mat[12] = t*mat[12]+(1-t)*e.curPosX;
-								mat[13] = t*mat[13]+(1-t)*e.curPosY;
-								mat[14] = t*mat[14]+(1-t)*e.curPosZ;
-
-								e.setMat(mat);
-
+								//if (dcMat[0] != Float.NaN) {
+								e.setMat(dcMat);
+								//}
 								e.zeroVelocities();
-								e.setLinVel(new Vector3(v[0], v[1], v[2]));
-								e.setAngVel(new Vector3(v[3], v[4], v[5]));
-							}*/
+								e.setLinVel(new Vector3(dc[16], dc[17], dc[18]));
+								e.setAngVel(new Vector3(dc[19], dc[20], dc[21]));
+								e.update(entities);
+							}
+						} else {
+							if (entCountDowns[i] == 0) {
+								mat = client.getDiscMatrix(i);
+								if (mat != null) {
+									e.setMat(mat);
+
+									float[] v = client.getVelocities(i);
+									e.zeroVelocities();
+									e.setLinVel(new Vector3(v[0], v[1], v[2]));
+									e.setAngVel(new Vector3(v[3], v[4], v[5]));
+								}
+							} else {
+								client.getDiscMatrix(i);
+								client.getVelocities(i);
+
+								/*if (mat != null && entCountDowns[i] >= COOLDOWN-AVGTIME){
+									float t = (entCountDowns[i]-(COOLDOWN-AVGTIME))/(float)AVGTIME;
+
+									mat[12] = t*mat[12]+(1-t)*e.curPosX;
+									mat[13] = t*mat[13]+(1-t)*e.curPosY;
+									mat[14] = t*mat[14]+(1-t)*e.curPosZ;
+
+									e.setMat(mat);
+
+									e.zeroVelocities();
+									e.setLinVel(new Vector3(v[0], v[1], v[2]));
+									e.setAngVel(new Vector3(v[3], v[4], v[5]));
+								}*/
+							}
 						}
 					}
 				}
 			}
 		}
-		else{
-			for (int i=0; i<12; i++) {
-				Entity e = Entity.ids.get(i);
-				if (e != null) {
-					if (e.isLocal()) {
-						if (client.newCorrectionAvailable(i)) {               //Applies any pending network collision correction before forces are added
-							float[] dc = client.getDiscCorrection(i);
 
-							float[] dcMat = Arrays.copyOfRange(dc, 0, 16);
-
-							//if (dcMat[0] != Float.NaN) {
-								e.setMat(dcMat);
-							//}
-							e.zeroVelocities();
-							e.setLinVel(new Vector3(dc[16], dc[17], dc[18]));
-							e.setAngVel(new Vector3(dc[19], dc[20], dc[21]));
-							e.update();
-						}
-					} else{
-						if (entCountDowns[i] == 0){
-							mat = client.getDiscMatrix(i);
-							if (mat != null) {
-								e.setMat(mat);
-
-								float[] v = client.getVelocities(i);
-								e.zeroVelocities();
-								e.setLinVel(new Vector3(v[0], v[1], v[2]));
-								e.setAngVel(new Vector3(v[3], v[4], v[5]));
-							}
-						}
-						else{
-							client.getDiscMatrix(i);
-							client.getVelocities(i);
-
-							/*if (mat != null && entCountDowns[i] >= COOLDOWN-AVGTIME){
-								float t = (entCountDowns[i]-(COOLDOWN-AVGTIME))/(float)AVGTIME;
-
-								mat[12] = t*mat[12]+(1-t)*e.curPosX;
-								mat[13] = t*mat[13]+(1-t)*e.curPosY;
-								mat[14] = t*mat[14]+(1-t)*e.curPosZ;
-
-								e.setMat(mat);
-
-								e.zeroVelocities();
-								e.setLinVel(new Vector3(v[0], v[1], v[2]));
-								e.setAngVel(new Vector3(v[3], v[4], v[5]));
-							}*/
-						}
-					}
-				}
-			}
-		}
-
-		// Fixes local discs if they falls off the map somehow
+		// Fixes local discs if they fall off the map somehow
 		if (p0.curPosY < -10){
 			p0.setPosition(new Vector3(p0.curPosX,30,p0.curPosZ));
-			p0.update();
+			p0.update(entities);
 		}
 
-		if(isServer && ball.curPosY < -10){
+		if((isLocal || isServer) && ball.curPosY < -10){
 			ball.setPosition(new Vector3(ball.curPosX,30,ball.curPosZ));
-			ball.update();
+			ball.update(entities);
 		}
 
 		// Handles input
@@ -511,15 +549,15 @@ public class Game implements Renderer {
 
 		// Updates Bullet physics world
 		world.update(System.currentTimeMillis());
-		for (Entity e : entities){
-			e.update();
+		for (Entity e : entities) {
+			e.update(entities);
 		}
 
 		// Fixes local discs if Bullet weirds out
 		if (Float.isNaN(p0.curPosX+p0.curVelX) || Float.isInfinite(p0.curPosX+p0.curVelX)){
 			p0.stepBack();
 		}
-		if (isServer && (Float.isNaN(ball.curPosX+ball.curVelX) || Float.isInfinite(ball.curPosX+ball.curVelX))){
+		if ((isLocal || isServer) && (Float.isNaN(ball.curPosX+ball.curVelX) || Float.isInfinite(ball.curPosX+ball.curVelX))){
 			ball.stepBack();
 		}
 
@@ -530,43 +568,44 @@ public class Game implements Renderer {
 				scoreCooldown = 0;
 			}
 		}
+		if (!isLocal) {
+			// Sends collision correction to remote discs a few frames after the local collision
+			for (int i = 0; i < entCountDowns.length; i++) {
+				Entity nonlocal = Entity.ids.get(i);
+				if (entCountDowns[i] == 5 && !nonlocal.isLocal()) {
+					byte[] data = new byte[92];
+					ByteBuffer bb = ByteBuffer.wrap(data);
+					FloatBuffer fb = bb.asFloatBuffer();
 
-		// Sends collision correction to remote discs a few frames after the local collision
-		for (int i=0; i<entCountDowns.length; i++){
-			Entity nonlocal = Entity.ids.get(i);
-			if (entCountDowns[i] == 5 && !nonlocal.isLocal()){
-				byte[] data = new byte[92];
-				ByteBuffer bb = ByteBuffer.wrap(data);
-				FloatBuffer fb = bb.asFloatBuffer();
+					//float[] matCopy = Arrays.copyOf(nonlocal.mat, 16);
+					//if (entCountDowns[nonlocal.getUniqueID()] != 0) {
+					//	matCopy[0] = Float.NaN;
+					//}
 
-				//float[] matCopy = Arrays.copyOf(nonlocal.mat, 16);
-				//if (entCountDowns[nonlocal.getUniqueID()] != 0) {
-				//	matCopy[0] = Float.NaN;
-				//}
+					fb.put(0f); //the respective buffer positions are independent, advances fb's position by putting temporary data
+					bb.putInt(nonlocal.uniqueID);
+					fb.put(nonlocal.mat);
+					fb.put(nonlocal.curVelX);
+					fb.put(nonlocal.curVelY);
+					fb.put(nonlocal.curVelZ);
+					fb.put(nonlocal.curAngVelX);
+					fb.put(nonlocal.curAngVelY);
+					fb.put(nonlocal.curAngVelZ);
 
-				fb.put(0f); //the respective buffer positions are independent, advances fb's position by putting temporary data
-				bb.putInt(nonlocal.uniqueID);
-				fb.put(nonlocal.mat);
-				fb.put(nonlocal.curVelX);
-				fb.put(nonlocal.curVelY);
-				fb.put(nonlocal.curVelZ);
-				fb.put(nonlocal.curAngVelX);
-				fb.put(nonlocal.curAngVelY);
-				fb.put(nonlocal.curAngVelZ);
-
-				if (isServer) {
-					AddressPort ap = nonlocal.getAddressPort();
-					try {
-						server.sendDiscCorrection(data, ap.address, ap.port);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				} else {
-					AddressPort ap = nonlocal.getAddressPort();
-					try {
-						client.sendDiscCorrection(data, ap.address, ap.port);
-					} catch (IOException e) {
-						e.printStackTrace();
+					if (isServer) {
+						AddressPort ap = nonlocal.getAddressPort();
+						try {
+							server.sendDiscCorrection(data, ap.address, ap.port);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					} else {
+						AddressPort ap = nonlocal.getAddressPort();
+						try {
+							client.sendDiscCorrection(data, ap.address, ap.port);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
 					}
 				}
 			}
@@ -611,7 +650,7 @@ public class Game implements Renderer {
 		boolean cs = world.clientScored(ball);
 		boolean ss = world.serverScored(ball);
 
-		if (isServer && scoreCooldown == 0 && (cs || ss)){
+		if ((isLocal || isServer) && scoreCooldown == 0 && (cs || ss)){
 			byte[] data = new byte[5];
 			ByteBuffer bb = ByteBuffer.wrap(data);
 			if (cs){
@@ -623,11 +662,12 @@ public class Game implements Renderer {
 				bb.putInt(++localScore);
 			}
 			scoreCooldown++;
+			if (!isLocal){
+				ArrayList<AddressPort> adds = server.getConnectedAddressPorts();
 
-			ArrayList<AddressPort> adds = server.getConnectedAddressPorts();
-
-			for (AddressPort add : adds){
-				server.sendAssured(Server.SCORE, data, add.address, add.port, 10000);
+				for (AddressPort add : adds) {
+					server.sendAssured(Server.SCORE, data, add.address, add.port, 10000);
+				}
 			}
 
 			p0.setPosition(new Vector3(151,30,81));
@@ -637,109 +677,116 @@ public class Game implements Renderer {
 			ball.setPosition(new Vector3(81,30,81));
 			ball.zeroVelocities();
 
-			for (int i=3; i<entities.size(); i+=2){
+			for (int i=3; i<entities.size()-2; i+=2){
 				Entity e = Entity.ids.get(i);
 				e.setPosition(new Vector3(151f,30f,81f+10*i));
 				e.zeroVelocities();
 			}
-			for (int i=4; i<entities.size(); i+=2){
+			for (int i=4; i<entities.size()-2; i+=2){
 				Entity e = Entity.ids.get(i);
 				e.setPosition(new Vector3(11f,30f,81f+10*i));
 				e.zeroVelocities();
 			}
+
+			life = 0;
+			countDownStartTime=null;
+			displayCountDown = true;
+			liftBall = true;
 		}
 
-		// Sends the telemetry for all local discs to all other players
-		if (sendCounter == 1) {
-			for (Entity e : entities) {
-				if (e.getUniqueID() != -1 && e.isLocal()) {
-					final byte[] data = new byte[92];
-					ByteBuffer bb = ByteBuffer.wrap(data, 0, 92);
-					FloatBuffer fb = bb.asFloatBuffer();
-					fb.put(0f);
-					bb.putInt(e.uniqueID);
-					fb.put(e.mat);
-					fb.put(e.curVelX);
-					fb.put(e.curVelY);
-					fb.put(e.curVelZ);
-					fb.put(e.curAngVelX);
-					fb.put(e.curAngVelY);
-					fb.put(e.curAngVelZ);
+		if (!isLocal) {
+			// Sends the telemetry for all local discs to all other players
+			if (sendCounter == 1) {
+				for (Entity e : entities) {
+					if (e.getUniqueID() != -1 && e.isLocal()) {
+						final byte[] data = new byte[92];
+						ByteBuffer bb = ByteBuffer.wrap(data, 0, 92);
+						FloatBuffer fb = bb.asFloatBuffer();
+						fb.put(0f);
+						bb.putInt(e.uniqueID);
+						fb.put(e.mat);
+						fb.put(e.curVelX);
+						fb.put(e.curVelY);
+						fb.put(e.curVelZ);
+						fb.put(e.curAngVelX);
+						fb.put(e.curAngVelY);
+						fb.put(e.curAngVelZ);
 
-					final ArrayList<AddressPort> adds;
-					if (isServer) {
-						adds = server.getConnectedAddressPorts();
-						new Thread() {
-							public void run() {
-								try {
-									for (AddressPort add : adds) {
-										server.sendDiscData(data, add.address, add.port);
+						final ArrayList<AddressPort> adds;
+						if (isServer) {
+							adds = server.getConnectedAddressPorts();
+							new Thread() {
+								public void run() {
+									try {
+										for (AddressPort add : adds) {
+											server.sendDiscData(data, add.address, add.port);
+										}
+									} catch (IOException e) {
+										e.printStackTrace();
 									}
-								} catch (IOException e) {
-									e.printStackTrace();
 								}
-							}
-						}.start();
+							}.start();
+						} else {
+							adds = Entity.addressPorts;
+							new Thread() {
+								public void run() {
+									try {
+										for (AddressPort add : adds) {
+											client.sendDiscData(data, add.address, add.port);
+										}
+									} catch (IOException e) {
+										e.printStackTrace();
+									}
+								}
+							}.start();
+						}
+					}
+				}
+			}
+			sendCounter++;
+			if (sendCounter == 2) sendCounter = 0;
+
+			// For client to respond to a server-sent score message
+			if (!isServer) {
+				Integer score = client.getScore();
+				if (score != null) {
+					int id = p0.getUniqueID();
+					if (id == 1) id++;
+					if (client.serverScored()) {
+						if (id % 2 == 0) networkScore = score;
+						else localScore = score;
 					} else {
-						adds = Entity.addressPorts;
-						new Thread() {
-							public void run() {
-								try {
-									for (AddressPort add : adds) {
-										client.sendDiscData(data, add.address, add.port);
-									}
-								} catch (IOException e) {
-									e.printStackTrace();
-								}
-							}
-						}.start();
+						if (id % 2 == 0) localScore = score;
+						else networkScore = score;
 					}
+
+					int xpos = 10;
+					int zpos = 81;
+
+					if (id % 2 == 1) {
+						if (id > 2) {
+							xpos = 151;
+							zpos = 81 + 10 * id;
+						} else xpos = 151;
+					} else {
+						if (id > 2) {
+							xpos = 11;
+							zpos = 81 + 10 * id;
+						}
+					}
+
+					p0.setPosition(new Vector3(xpos, 30, zpos));
+					p0.zeroVelocities();
+					ball.setPosition(new Vector3(81, 30, 81));
+					ball.zeroVelocities();
+
+					life = 0;
+					countDownStartTime=null;
+					displayCountDown = true;
+					liftBall = true;
 				}
 			}
 		}
-		sendCounter++;
-		if (sendCounter == 2) sendCounter = 0;
-
-		// For client to respond to a server-sent score message
-		if (!isServer){
-			Integer score = client.getScore();
-			if (score != null){
-				int id = p0.getUniqueID();
-				if (id == 1) id++;
-				if (client.serverScored()){
-					if (id%2 == 0) networkScore = score;
-					else localScore = score;
-				}
-				else{
-					if (id%2 == 0) localScore = score;
-					else networkScore = score;
-				}
-
-				int xpos = 10;
-				int zpos = 81;
-
-				if (id%2 == 1){
-					if (id > 2){
-						xpos = 151;
-						zpos = 81 + 10 * id;
-					}
-					else xpos = 151;
-				}
-				else {
-					if (id > 2){
-						xpos = 11;
-						zpos = 81 + 10 * id;
-					}
-				}
-
-				p0.setPosition(new Vector3(xpos,30,zpos));
-				p0.zeroVelocities();
-				ball.setPosition(new Vector3(81,30,81));
-				ball.zeroVelocities();
-			}
-		}
-
-		if (life < 5) life++;
 	}
 
 	// Renders the graphical world
@@ -874,18 +921,18 @@ public class Game implements Renderer {
 					0,0,1,0,
 					151f,30f,81f,1};
 
-		if (isServer){
-			Entity e0 = new Entity(tempVerts, trans2, 1f, tempFaces, tempNormals, tempUV, 13, false, null, world, true, true, 0, null);
-			Entity e1 = new Entity(tempVerts, trans, 1f, tempFaces, tempNormals, tempUV, 14, false, null, world, true, false, 1, null);
+		if (isServer || isLocal){
+			Entity e0 = new Entity(tempVerts, trans2, 1f, tempFaces, tempNormals, tempUV, 13, false, null, world, true, true, 0, null, false);
+			Entity e1 = new Entity(tempVerts, trans, 1f, tempFaces, tempNormals, tempUV, 14, false, null, world, true, isLocal, 1, null, isLocal);
 
 			entities.add(e0);
 			entities.add(e1);
 		}
 		else{
-			Entity e0 = new Entity(tempVerts, trans, 1f, tempFaces, tempNormals, tempUV, 14, false, null, world, true, true, 1, null);
-			Entity e1;
+			Entity e0 = new Entity(tempVerts, trans, 1f, tempFaces, tempNormals, tempUV, 14, false, null, world, true, true, 1, null,false);
+			Entity e1=null;
 			//try {
-				e1 = new Entity(tempVerts, trans2, 1f, tempFaces, tempNormals, tempUV, 13, false, null, world, true, false, 0, /*new AddressPort(InetAddress.getByName("10.0.2.6"),27015)*/ new AddressPort(serviceListener.host, serviceListener.port));
+				e1 = new Entity(tempVerts, trans2, 1f, tempFaces, tempNormals, tempUV, 13, false, null, world, true, false, 0, /*new AddressPort(InetAddress.getByName("10.0.2.6"),27015)*/ new AddressPort(serviceListener.host, serviceListener.port),false);
 			//} catch (UnknownHostException e) {
 			//	e.printStackTrace();
 			//}
@@ -1000,7 +1047,7 @@ public class Game implements Renderer {
 			add = entities.get(1).getAddressPort();
 		}
 
-		entities.add(new Entity(tempVerts, trans, 0.5f, tempFaces, tempNormals, tempUV, 0, false, null, world, true, local, 2, add)); // The ball
+		entities.add(new Entity(tempVerts, trans, 0.5f, tempFaces, tempNormals, tempUV, 0, false, null, world, true, local, 2, add,false)); // The ball
 		//entities.get(0).makeKinematic();
 		//entities.get(1).makeKinematic();
 	}
@@ -1035,7 +1082,7 @@ public class Game implements Renderer {
 				0, 1, 0, 0,
 				0, 0, 1, 0,
 				0, 0, 0, 1};
-		entities.add(new Entity(tempVerts, trans, 0f, tempFaces, tempNormals, tempUV, 14, false, null, null, false, false, -1, null));
+		entities.add(new Entity(tempVerts, trans, 0f, tempFaces, tempNormals, tempUV, 14, false, null, null, false, false, -1, null,false));
 
 		miny = 0;
 		maxy = World.scale*World.EDGE_WIDTH;
@@ -1049,7 +1096,7 @@ public class Game implements Renderer {
 				new Vector3(xval, maxy, maxz),
 				new Vector3(xval, maxy, minz)));
 
-		entities.add(new Entity(tempVerts, trans, 0f, tempFaces, tempNormals, tempUV, 13, false, null, null, false, false, -1, null));
+		entities.add(new Entity(tempVerts, trans, 0f, tempFaces, tempNormals, tempUV, 13, false, null, null, false, false, -1, null,false));
 	}
 
 	// For the generation of a sphere approximating triangle mesh with arbitrary resolution
@@ -1150,12 +1197,15 @@ public class Game implements Renderer {
 					float y = invProj[1]*10;
 
 					if(y<2.5 && y>-2.5){
-						if (x<-1 && x>-6){
+						if (x<11 && x>6){
 							serverButtonDownInBounds = true;
 						}
-						else if(x<6 && x>1){
+						else if(x<2.5f && x>-2.5f){
 
 							clientButtonDownInBounds = true;
+						}
+						else if (x < -6 && x > -11){
+							singleButtonDownInBounds = true;
 						}
 					}
 				}
@@ -1179,7 +1229,7 @@ public class Game implements Renderer {
 					float y = invProj[1]*10;
 
 					if(y<2.5 && y>-2.5){
-						if (x<-1 && x>-6 && serverButtonDownInBounds){
+						if (x<11 && x>6 && serverButtonDownInBounds){
 							isServer = true;
 							initializeWorld(null);
 							selected = true;
@@ -1190,7 +1240,7 @@ public class Game implements Renderer {
 							}
 							server.start();
 						}
-						else if(x<6 && x>1 && clientButtonDownInBounds){
+						else if(x<2.5f && x>-2.5f && clientButtonDownInBounds){
 							selected = true;
 							try {
 								client = new Client();
@@ -1204,12 +1254,19 @@ public class Game implements Renderer {
 							} catch (UnknownHostException e) {
 								e.printStackTrace();
 							}*/
-							System.out.print("hellop");
+						}
+						else if(x<-6 && x>-11 && singleButtonDownInBounds){
+							selected = true;
+							isLocal = true;
+
+							initializeWorld(null);
+							ready = true;
 						}
 					}
 
 					serverButtonDownInBounds = false;
 					clientButtonDownInBounds = false;
+					singleButtonDownInBounds = false;
 				}
 			}
 		}
@@ -1217,8 +1274,8 @@ public class Game implements Renderer {
 
 	// Add the client/server selection buttons
 	public void addButtons() {
-		float minx = 1;
-		float maxx = 6;
+		float minx = -2.5f;
+		float maxx = 2.5f;
 		float miny = -2.5f;
 		float maxy = 2.5f;
 
@@ -1245,8 +1302,8 @@ public class Game implements Renderer {
 				0, 0, 0, 1};
 		clientButton = new Entity(tempVerts, trans, 0, tempFaces, tempNormals, tempUV, 15, null, null);
 
-		minx = -6;
-		maxx = -1;
+		minx = 6;
+		maxx = 11;
 		miny = -2.5f;
 		maxy = 2.5f;
 
@@ -1256,6 +1313,18 @@ public class Game implements Renderer {
 				new Vector3(maxx, miny, -10)));
 
 		serverButton = new Entity(tempVerts, trans, 0, tempFaces, tempNormals, tempUV, 17, null, null);
+
+		minx = -11;
+		maxx = -6;
+		miny = -2.5f;
+		maxy = 2.5f;
+
+		tempVerts = new ArrayList<>(Arrays.asList(new Vector3(minx, miny, -10),
+				new Vector3(minx, maxy, -10),
+				new Vector3(maxx, maxy, -10),
+				new Vector3(maxx, miny, -10)));
+
+		singleButton = new Entity(tempVerts, trans, 0, tempFaces, tempNormals, tempUV, 19, null, null);
 	}
 
 	// Draws the player scores on top of the screen
@@ -1268,23 +1337,47 @@ public class Game implements Renderer {
 		float[] view = {1, 0, 0, 0,
 				0, 1, 0, 0,
 				0, 0, 1, 0,
-				-19.5f, 12.5f, -6, 1};
+				-24f, 12.5f, -6, 1};
 
 		String str = Integer.toString(localScore);
 
 		for (int i = 0; i < str.length(); i++) {
 			String cur = str.substring(i,i+1);
-			Draw.drawFullbright(serverButton.vertBufInd, serverButton.faceBufInd, serverButton.faces.size() * 3, view, mProjectionMatrix, ident,Integer.parseInt(cur)+3);
+			Draw.drawFullbright(clientButton.vertBufInd, clientButton.faceBufInd, clientButton.faces.size() * 3, view, mProjectionMatrix, ident,Integer.parseInt(cur)+3);
 			view[12] += 2;
 		}
 
 		view[13] = 8.5f;
-		view[12] = -19.5f;
+		view[12] = -24f;
 		str = Integer.toString(networkScore);
+		//str = Integer.toString((int)(1000*Math.abs(aiController.debugDist)));
+		for (int i = 0; i < str.length(); i++) {
+			String cur = str.substring(i,i+1);
+			Draw.drawFullbright(clientButton.vertBufInd, clientButton.faceBufInd, clientButton.faces.size() * 3, view, mProjectionMatrix, ident,Integer.parseInt(cur)+3);
+			view[12] += 2;
+		}
+	}
+
+	public void drawCountDown(){
+		int diff = (int)(System.currentTimeMillis()-countDownStartTime);
+
+		float size = 12f*(diff%1000)/1000f;
+
+		float[] ident = {1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1/size};
+
+		float[] view = {1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				0, 12.5f, -6, 1};
+
+		String str = Long.toString(3-diff/1000);
 
 		for (int i = 0; i < str.length(); i++) {
 			String cur = str.substring(i,i+1);
-			Draw.drawFullbright(serverButton.vertBufInd, serverButton.faceBufInd, serverButton.faces.size() * 3, view, mProjectionMatrix, ident,Integer.parseInt(cur)+3);
+			Draw.drawFullbright(clientButton.vertBufInd, clientButton.faceBufInd, clientButton.faces.size() * 3, view, mProjectionMatrix, ident,Integer.parseInt(cur)+3);
 			view[12] += 2;
 		}
 	}

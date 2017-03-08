@@ -18,14 +18,14 @@ import android.opengl.GLUtils;
 import android.opengl.Matrix;
 import android.util.Log;
 
-import com.mockitleaguemassive.R;
+import com.minimalistsoccer.R;
 
 // OpenGL shader, initialization and drawing
 
 public class Draw {
 	
 	
-	public static int[] textures = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	public static int[] textures = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	
 	public static ArrayList<Integer> texWidths;
 	public static ArrayList<Integer> texHeights;
@@ -594,56 +594,29 @@ public class Draw {
 		types.add(GL10.GL_TEXTURE_2D);//16
 		types.add(GL10.GL_TEXTURE_2D);//17
 		types.add(GL10.GL_TEXTURE_2D);//18
+		types.add(GL10.GL_TEXTURE_2D);//19
+		types.add(GL10.GL_TEXTURE_2D);//20
 
-
-		in.add(context.getResources().openRawResource(R.drawable.red));
-		in.add(context.getResources().openRawResource(R.drawable.grass));
-		in.add(context.getResources().openRawResource(R.drawable.skyzn));
-		in.add(context.getResources().openRawResource(R.drawable.skyzp));
-		in.add(context.getResources().openRawResource(R.drawable.skyyn));
-		in.add(context.getResources().openRawResource(R.drawable.skyyp));
-		in.add(context.getResources().openRawResource(R.drawable.skyxp));
-		in.add(context.getResources().openRawResource(R.drawable.skyxn));
-		in.add(context.getResources().openRawResource(R.drawable.d0));
-		in.add(context.getResources().openRawResource(R.drawable.d1));
-		in.add(context.getResources().openRawResource(R.drawable.d2));
-		in.add(context.getResources().openRawResource(R.drawable.d3));
-		in.add(context.getResources().openRawResource(R.drawable.d4));
-		in.add(context.getResources().openRawResource(R.drawable.d5));
-		in.add(context.getResources().openRawResource(R.drawable.d6));
-		in.add(context.getResources().openRawResource(R.drawable.d7));
-		in.add(context.getResources().openRawResource(R.drawable.d8));
-		in.add(context.getResources().openRawResource(R.drawable.d9));
-		in.add(context.getResources().openRawResource(R.drawable.green));
-		in.add(context.getResources().openRawResource(R.drawable.blue));
-
-		{
-			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
-			Canvas canvas = new Canvas(bitmap);
-			bitmap.eraseColor(Color.WHITE);
-
-			Paint textPaint = new Paint();
-			textPaint.setTextSize(64);
-			textPaint.setAntiAlias(true);
-			textPaint.setARGB(0xff, 0xff, 0x00, 0x00);
-			canvas.drawText("Client", 16,112, textPaint);
-
-			bitmaps.add(bitmap);
-		}
-
-		{
-			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
-			Canvas canvas = new Canvas(bitmap);
-			bitmap.eraseColor(Color.RED);
-
-			Paint textPaint = new Paint();
-			textPaint.setTextSize(64);
-			textPaint.setAntiAlias(true);
-			textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
-			canvas.drawText("Client", 16,112, textPaint);
-
-			bitmaps.add(bitmap);
-		}
+		in.add(context.getResources().openRawResource(+ R.drawable.red));
+		in.add(context.getResources().openRawResource(+ R.drawable.grass));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyzn));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyzp));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyyn));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyyp));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyxp));
+		in.add(context.getResources().openRawResource(+ R.drawable.skyxn));
+		in.add(context.getResources().openRawResource(+ R.drawable.d0));
+		in.add(context.getResources().openRawResource(+ R.drawable.d1));
+		in.add(context.getResources().openRawResource(+ R.drawable.d2));
+		in.add(context.getResources().openRawResource(+ R.drawable.d3));
+		in.add(context.getResources().openRawResource(+ R.drawable.d4));
+		in.add(context.getResources().openRawResource(+ R.drawable.d5));
+		in.add(context.getResources().openRawResource(+ R.drawable.d6));
+		in.add(context.getResources().openRawResource(+ R.drawable.d7));
+		in.add(context.getResources().openRawResource(+ R.drawable.d8));
+		in.add(context.getResources().openRawResource(+ R.drawable.d9));
+		in.add(context.getResources().openRawResource(+ R.drawable.green));
+		in.add(context.getResources().openRawResource(+ R.drawable.blue));
 
 		{
 			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
@@ -653,8 +626,8 @@ public class Draw {
 			Paint textPaint = new Paint();
 			textPaint.setTextSize(64);
 			textPaint.setAntiAlias(true);
-			textPaint.setARGB(0xff, 0xff, 0x00, 0x00);
-			canvas.drawText("Server", 16,112, textPaint);
+			textPaint.setARGB(0xff, 0x00, 0x00, 0x00);
+			canvas.drawText("Join", 46,152, textPaint);
 
 			bitmaps.add(bitmap);
 		}
@@ -662,13 +635,71 @@ public class Draw {
 		{
 			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
 			Canvas canvas = new Canvas(bitmap);
-			bitmap.eraseColor(Color.RED);
+			bitmap.eraseColor(Color.BLACK);
 
 			Paint textPaint = new Paint();
 			textPaint.setTextSize(64);
 			textPaint.setAntiAlias(true);
 			textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
-			canvas.drawText("Server", 16,112, textPaint);
+			canvas.drawText("Join", 46,152, textPaint);
+
+			bitmaps.add(bitmap);
+		}
+
+		{
+			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bitmap);
+			bitmap.eraseColor(Color.WHITE);
+
+			Paint textPaint = new Paint();
+			textPaint.setTextSize(64);
+			textPaint.setAntiAlias(true);
+			textPaint.setARGB(0xff, 0x00, 0x00, 0x00);
+			canvas.drawText("Host", 46,152, textPaint);
+
+			bitmaps.add(bitmap);
+		}
+
+		{
+			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bitmap);
+			bitmap.eraseColor(Color.BLACK);
+
+			Paint textPaint = new Paint();
+			textPaint.setTextSize(64);
+			textPaint.setAntiAlias(true);
+			textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
+			canvas.drawText("Host", 46,152, textPaint);
+
+			bitmaps.add(bitmap);
+		}
+
+		{
+			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bitmap);
+			bitmap.eraseColor(Color.WHITE);
+
+			Paint textPaint = new Paint();
+			textPaint.setTextSize(64);
+			textPaint.setAntiAlias(true);
+			textPaint.setARGB(0xff, 0x00, 0x00, 0x00);
+			canvas.drawText("Single", 36,112, textPaint);
+            canvas.drawText("Player", 36,182, textPaint);
+
+			bitmaps.add(bitmap);
+		}
+
+		{
+			Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
+			Canvas canvas = new Canvas(bitmap);
+			bitmap.eraseColor(Color.BLACK);
+
+			Paint textPaint = new Paint();
+			textPaint.setTextSize(64);
+			textPaint.setAntiAlias(true);
+			textPaint.setARGB(0xff, 0xff, 0xff, 0xff);
+            canvas.drawText("Single", 36,112, textPaint);
+            canvas.drawText("Player", 36,182, textPaint);
 
 			bitmaps.add(bitmap);
 		}
